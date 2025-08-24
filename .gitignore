@@ -1,26 +1,42 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.sqlite3
+*.py[cod]
+*.so
 *.egg-info/
-*.egg
-
-# Virtual environment
 venv/
-env/
+.env
+*.log
 
-# VSCode
-.vscode/
-
-# Node / React Native
+# Node / React / Expo
 node_modules/
-npm-debug.log
-yarn-error.log
-dist/
+npm-debug.log*
+yarn-error.log*
 .expo/
+.web-build/
+dist/
+build/
 
-# OS files
+# IDE / OS / Editors
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
+*.sublime-project
+*.sublime-workspace
+
+# Git
+*.orig
+*.bak
+*.tmp
+
+# Testing / coverage
+.coverage
+htmlcov/
+.tox/
+.pytest_cache/
+coverage.xml
+
+# Misc
+*.swp
+*.swo
+
