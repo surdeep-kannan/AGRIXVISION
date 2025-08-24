@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.egg-info/
+*.egg
+
+# Virtual environment
+venv/
+env/
+
+# VSCode
+.vscode/
+
+# Node / React Native
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+.expo/
+
+# OS files
+.DS_Store
+Thumbs.db
