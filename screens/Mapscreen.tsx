@@ -1,273 +1,407 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, StyleSheet, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Alert } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import * as Location from 'expo-location';
-
-interface WebviewMessage {
-  action: 'get_location';
-}
+import * as Network from 'expo-network';
 
 const HTML_TEMPLATE = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mobile Farm Dashboard</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; overflow: hidden; background-color: #f7f9fc; }
-    .container { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
-    #map-container { position: relative; flex-grow: 1; height: 60%; }
-    #map { height: 100%; width: 100%; }
-    #info-panel { flex: none; height: 40%; padding: 1rem; background: #ffffff; overflow-y: auto; border-top-left-radius: 12px; border-top-right-radius: 12px; box-shadow: 0 -4px 12px rgba(0,0,0,0.08); }
-    h2, h3 { border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; margin-top: 0; color: #2d3748; }
-    .location-input { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; justify-content: center; }
-    .location-input input { flex: 1; padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 8px; min-width: 80px; }
-    .location-input button { padding: 0.5rem 1rem; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: #fff; background-color: #4a5568; transition: background-color 0.2s ease-in-out; }
-    .location-input button:hover { background-color: #2d3748; }
-    #status { text-align: center; margin-top: 1rem; color: #718096; font-style: italic; }
-    .map-buttons { position: absolute; top: 1rem; right: 1rem; z-index: 1000; display: flex; flex-direction: column; gap: 0.5rem; background: rgba(255, 255, 255, 0.9); padding: 0.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .map-buttons button { padding: 0.5rem 0.75rem; font-size: 0.875rem; cursor: pointer; border: 1px solid #e2e8f0; background: #fff; border-radius: 6px; transition: all 0.2s; }
-    .map-buttons button:hover { background-color: #edf2f7; border-color: #a0aec0; }
-    .legend { position: absolute; bottom: 1rem; left: 1rem; z-index: 1000; background: rgba(255, 255, 255, 0.85); padding: 0.75rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); max-width: 150px; }
-    .legend h4 { margin: 0 0 0.5rem; text-align: center; border-bottom: none; }
-    .legend div { display: flex; align-items: center; margin-bottom: 0.25rem; }
-    .legend i { width: 16px; height: 16px; float: left; margin-right: 0.5rem; opacity: 0.9; border: 1px solid #999; border-radius: 4px; }
-    #stats p, #soil-stats p { margin: 0.5rem 0; font-size: 0.9rem; color: #4a5568; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriXVision | Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  --primary: #10b981;
+  --primary-dark: #059669;
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-800: #1e293b;
+  --glass: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.4);
+}
+
+body, html {
+  margin: 0; padding: 0; height: 100%; width: 100%;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  overflow: hidden;
+}
+
+#map { height: 100%; width: 100%; z-index: 1; }
+
+/* Control Overlays */
+.overlay {
+  position: absolute;
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+/* Header Search Bar */
+.top-bar {
+  top: 15px; left: 15px; right: 15px;
+  display: flex; gap: 8px; align-items: center;
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+.brand {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--primary); font-weight: 800; font-size: 16px;
+  margin-right: 8px;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 10px;
+}
+
+.logo-img {
+  height: 32px;
+  width: auto;
+}
+
+.input-group { display: flex; flex: 1; gap: 4px; min-width: 0; }
+input {
+  flex: 1;
+  background: var(--slate-100);
+  border: 1px solid transparent;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--slate-800);
+  outline: none;
+  min-width: 0;
+  transition: border-color 0.2s;
+}
+input:focus { border-color: var(--primary); }
+input::placeholder { color: #94a3b8; }
+
+.btn-main {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.1s, background 0.2s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-main:active { transform: scale(0.96); background: var(--primary-dark); }
+
+.btn-icon {
+  background: var(--slate-100);
+  color: #475569;
+  border: none;
+  width: 36px; height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+/* Side Layer Controls */
+.side-controls {
+  top: 90px; left: 15px;
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--glass-border);
+  display: flex; flex-direction: column; gap: 4px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+@media (max-width: 400px) {
+  .side-controls { top: 100px; }
+  .logo-container span { display: none; }
+}
+
+.layer-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 8px 6px;
+  border-radius: 10px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 54px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.layer-btn i { font-size: 14px; }
+.layer-btn.active {
+  background: white;
+  color: var(--primary);
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* Bottom Stats Card */
+.stats-card {
+  bottom: 25px; left: 15px; right: 15px;
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  transform: translateY(130%);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.stats-card.visible { transform: translateY(0); }
+
+.stats-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); 
+  gap: 12px; 
+}
+
+@media (max-width: 380px) {
+  .stats-grid { grid-template-columns: 1fr; gap: 8px; }
+  .stat-item { display: flex; justify-content: space-between; align-items: center; text-align: left; }
+  .stat-label { margin-bottom: 0; }
+  .top-bar { padding: 6px; gap: 4px; }
+  input { font-size: 12px; }
+  .btn-main { padding: 8px 10px; font-size: 12px; }
+}
+
+.stat-item { text-align: center; }
+.stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.stat-value { font-size: 15px; font-weight: 700; color: var(--slate-800); }
+
+.status-indicator {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(0,0,0,0.05);
+  font-size: 12px; font-weight: 600; color: var(--primary);
+}
+
+#status-text { margin: 0; font-size: 12px; color: #64748b; text-align: center; margin-top: 10px; }
+
+/* Pulse animation for loading */
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+.loading { animation: pulse 1.5s infinite; color: var(--primary); font-weight: 700; }
+</style>
 </head>
 <body>
-  <div class="container">
-    <div id="map-container">
-      <div id="map"></div>
-      <div class="map-buttons">
-        <button id="show-ndvi">Health</button>
-        <button id="show-ndwi">Water</button>
-        <button id="show-soil">Soil</button>
-        <button id="show-lst">Temp.</button>
-      </div>
-      <div id="legend" class="legend"></div>
+
+<div id="map"></div>
+
+<!-- Floating UI Elements -->
+<div class="overlay top-bar">
+  <div class="brand"><i class="fas fa-leaf"></i> <span>AGRIX</span></div>
+  <div class="input-group">
+    <input id="lat" placeholder="Lat" type="number" step="any">
+    <input id="lon" placeholder="Lon" type="number" step="any">
+  </div>
+  <button class="btn-icon" onclick="gps()"><i class="fas fa-location-crosshairs"></i></button>
+  <button class="btn-main" onclick="analyze()" id="analyze-btn"><i class="fas fa-wand-magic-sparkles"></i> <span>Analyze</span></button>
+</div>
+
+<div class="overlay side-controls">
+  <button class="layer-btn active" id="btn-ndvi" onclick="switchLayer('ndvi_map_url', this)"><i class="fas fa-heart-pulse"></i>Health</button>
+  <button class="layer-btn" id="btn-ndwi" onclick="switchLayer('ndwi_map_url', this)"><i class="fas fa-droplet"></i>Water</button>
+  <button class="layer-btn" id="btn-moist" onclick="switchLayer('soil_moisture_map_url', this)"><i class="fas fa-seedling"></i>Soil</button>
+  <button class="layer-btn" id="btn-temp" onclick="switchLayer('lst_map_url', this)"><i class="fas fa-temperature-high"></i>Temp</button>
+</div>
+
+<div class="overlay stats-card" id="stats-card">
+  <div class="stats-grid">
+    <div class="stat-item">
+      <div class="stat-label">Health Status</div>
+      <div class="stat-value" id="val-health">---</div>
     </div>
-    <div id="info-panel">
-      <h2>Field Analysis</h2>
-      <div class="location-input">
-        <input type="text" id="lat-input" placeholder="Latitude">
-        <input type="text" id="lon-input" placeholder="Longitude">
-        <button id="manual-submit">Analyze</button>
-        <button id="gps-submit">GPS</button>
-      </div>
-      <p id="status">Enter coordinates or use your GPS.</p>
-      <div id="stats"></div>
-      <h3>Soil Properties</h3>
-      <div id="soil-stats"></div>
+    <div class="stat-item">
+      <div class="stat-label">Surface Temp</div>
+      <div class="stat-value" id="val-temp">---</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Soil Carbon</div>
+      <div class="stat-value" id="val-carbon">---</div>
     </div>
   </div>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    (function() {
-      const map = L.map('map').setView([20.5937, 78.9629], 5);
-      const statusElement = document.getElementById('status');
-      const statsElement = document.getElementById('stats');
-      const soilStatsElement = document.getElementById('soil-stats');
-      const legendElement = document.getElementById('legend');
-      let ndviLayer, ndwiLayer, soilMoistureLayer, lstLayer;
-      let fieldBoundaryLayer = null;
+  <div class="status-indicator" id="status-indicator">
+    <span id="status-icon"><i class="fas fa-circle-notch fa-spin" style="display:none;" id="spinner"></i><i class="fas fa-bolt" id="static-icon"></i></span>
+    <span id="status-msg">Ready for Analysis</span>
+  </div>
+</div>
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap'
-      }).addTo(map);
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var BACKEND_URL = "http://10.101.59.109:8000";
+var map = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5);
 
-      const legends = {
-        ndvi: \`<h4>Health (NDVI)</h4><div><i style="background:green"></i><span>Healthy</span></div><div><i style="background:yellow"></i><span>Stressed</span></div><div><i style="background:red"></i><span>Bare Soil</span></div>\`,
-        ndwi: \`<h4>Water Stress (NDWI)</h4><div><i style="background:blue"></i><span>High Water</span></div><div><i style="background:white;"></i><span>Low Water</span></div><div><i style="background:yellow"></i><span>Stressed</span></div>\`,
-        soil: \`<h4>Soil Moisture</h4><div><i style="background:blue"></i><span>Very Wet</span></div><div><i style="background:cyan"></i><span>Moist</span></div><div><i style="background:yellow"></i><span>Dry</span></div><div><i style="background:red"></i><span>Very Dry</span></div>\`,
-        lst: \`<h4>Surface Temp. (°C)</h4><div><i style="background:red"></i><span>High (~40)</span></div><div><i style="background:yellow"></i><span>Moderate</span></div><div><i style="background:green"></i><span>Cool</span></div><div><i style="background:blue"></i><span>Low (~15)</span></div>\`
-      };
+// Modern Tile Layer
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap &copy; CARTO'
+}).addTo(map);
 
-      function updateLegend(type) {
-        legendElement.innerHTML = legends[type] || '';
-      }
+var currentLayer = null;
+var currentTileLayer = null;
+var lastData = null;
 
-      function clearLayers() {
-        map.eachLayer(l => {
-          if (l instanceof L.TileLayer && l.getAttribution() !== '&copy; OpenStreetMap') {
-            map.removeLayer(l);
-          }
-        });
-      }
+function analyze() {
+  let lat = parseFloat(document.getElementById("lat").value);
+  let lon = parseFloat(document.getElementById("lon").value);
+  if (isNaN(lat) || isNaN(lon)) {
+    updateStatus("Enter coordinates", "fa-circle-exclamation");
+    return;
+  }
+  load(lat, lon);
+}
 
-      async function loadSatelliteData(lat, lon) {
-        statusElement.innerText = 'Analyzing satellite data... Please wait.';
-        statsElement.innerHTML = "";
-        soilStatsElement.innerHTML = "";
-        clearLayers();
-        if (fieldBoundaryLayer) {
-          map.removeLayer(fieldBoundaryLayer);
-        }
+function updateStatus(msg, iconClass, isLoading) {
+  const msgEl = document.getElementById("status-msg");
+  const spinner = document.getElementById("spinner");
+  const staticIcon = document.getElementById("static-icon");
+  
+  msgEl.innerText = msg;
+  msgEl.className = isLoading ? "loading" : "";
+  
+  if (isLoading) {
+    spinner.style.display = "inline-block";
+    staticIcon.style.display = "none";
+  } else {
+    spinner.style.display = "none";
+    staticIcon.style.display = "inline-block";
+    staticIcon.className = "fas " + iconClass;
+  }
+}
 
-        try {
-          const response = await fetch(\`http://10.72.55.187:8000/get_field_health?lat=\${lat}&lon=\${lon}\`);
-          const data = await response.json();
-          
-          if (data.error) {
-            statusElement.innerText = \`Error: \${data.error}\`;
-            return;
-          }
+function switchLayer(type, btn) {
+  if (!lastData) return;
+  
+  if (!btn) btn = document.getElementById("btn-ndvi");
+  if (!type) type = "ndvi_map_url";
 
-          statusElement.innerText = "Data loaded successfully.";
-          statsElement.innerHTML = \`
-            <p><strong>Health Status:</strong> \${data.health_status}</p>
-            <p><strong>Avg. Surface Temp:</strong> \${data.avg_temp_celsius || 'N/A'} °C</p>
-          \`;
-          soilStatsElement.innerHTML = \`<p><strong>Est. Soil Organic Carbon:</strong> \${data.soil_organic_carbon || 'N/A'}</p>\`;
+  document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
 
-          fieldBoundaryLayer = L.polygon(data.field_boundary, {color: '#3498db', fillOpacity: 0.2, weight: 2}).addTo(map);
-          map.fitBounds(fieldBoundaryLayer.getBounds(), {padding: [50, 50]});
+  if (currentTileLayer) map.removeLayer(currentTileLayer);
+  
+  if (lastData[type]) {
+    currentTileLayer = L.tileLayer(lastData[type], {
+      attribution: 'Google Earth Engine',
+      opacity: 0.8
+    }).addTo(map);
+    updateStatus("Viewing " + btn.innerText, "fa-satellite-dish");
+  } else {
+    updateStatus("Data missing", "fa-triangle-exclamation");
+  }
+}
 
-          ndviLayer = L.tileLayer(data.ndvi_map_url, {attribution: 'Mock Data'});
-          ndwiLayer = L.tileLayer(data.ndwi_map_url, {attribution: 'Mock Data'});
-          soilMoistureLayer = L.tileLayer(data.soil_moisture_map_url, {attribution: 'Mock Data'});
-          lstLayer = L.tileLayer(data.lst_map_url, {attribution: 'Mock Data'});
-          
-          ndviLayer.addTo(map);
-          updateLegend('ndvi');
+function gps() {
+  window.ReactNativeWebView.postMessage(JSON.stringify({ action: "get_location" }));
+}
 
-          document.getElementById('show-ndvi').onclick = () => { clearLayers(); ndviLayer.addTo(map); updateLegend('ndvi'); };
-          document.getElementById('show-ndwi').onclick = () => { clearLayers(); ndwiLayer.addTo(map); updateLegend('ndwi'); };
-          document.getElementById('show-soil').onclick = () => { clearLayers(); soilMoistureLayer.addTo(map); updateLegend('soil'); };
-          document.getElementById('show-lst').onclick = () => { clearLayers(); lstLayer.addTo(map); updateLegend('lst'); };
+async function load(lat, lon) {
+  updateStatus("Syncing Satellites...", "", true);
+  document.getElementById("stats-card").classList.remove("visible");
+  
+  try {
+    let url = BACKEND_URL + "/get_field_health?lat=" + lat + "&lon=" + lon;
+    let res = await fetch(url);
+    let data = await res.json();
 
-        } catch (error) {
-          statusElement.innerText = "Could not connect to the server or process data.";
-        }
-      }
+    if (data.error) throw data.error;
+    lastData = data;
 
-      document.getElementById('manual-submit').addEventListener('click', () => {
-        const lat = parseFloat(document.getElementById('lat-input').value);
-        const lon = parseFloat(document.getElementById('lon-input').value);
-        if (isNaN(lat) || isNaN(lon)) {
-          statusElement.innerText = "Please enter valid Latitude and Longitude.";
-          return;
-        }
-        loadSatelliteData(lat, lon);
-      });
-    })();
-  </script>
+    // Update Card Data
+    document.getElementById("val-health").innerText = data.health_status;
+    document.getElementById("val-temp").innerText = data.avg_temp_celsius + "°C";
+    document.getElementById("val-carbon").innerText = data.soil_organic_carbon;
+
+    if (currentLayer) map.removeLayer(currentLayer);
+    
+    switchLayer('ndvi_map_url', document.getElementById("btn-ndvi"));
+
+    currentLayer = L.polygon(data.field_boundary, {
+      color: "#10b981", 
+      weight: 3, 
+      fillColor: "#10b981",
+      fillOpacity: 0.1
+    }).addTo(map);
+    
+    map.flyToBounds(currentLayer.getBounds(), { padding: [50, 50], duration: 1.5 });
+    
+    setTimeout(() => {
+      document.getElementById("stats-card").classList.add("visible");
+      updateStatus("Analysis Complete", "");
+    }, 500);
+
+  } catch (e) {
+    updateStatus("Sync Failed", "fa-circle-xmark");
+  }
+}
+
+window.addEventListener("message", e => {
+  let d = JSON.parse(e.data);
+  if (d.type === "SET_OFFLINE") {
+    updateStatus(d.value ? "Working Offline" : "Connected", d.value ? "fa-moon" : "fa-sun");
+  }
+});
+</script>
 </body>
 </html>
 `;
 
 export default function MapScreen() {
-  const webViewRef = useRef<WebView>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+    const webViewRef = useRef<WebView>(null);
+    const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    if (Platform.OS === 'android' && !Location.hasServicesEnabledAsync()) {
-      Alert.alert(
-        'Location Services Disabled',
-        'Please enable location services to use GPS features.',
-        [{ text: 'OK' }],
-        { cancelable: false }
-      );
-    }
-  }, []);
-
-  const handleMessage = async (event: WebViewMessageEvent) => {
-    try {
-      const data: WebviewMessage = JSON.parse(event.nativeEvent.data);
-      if (data.action === 'get_location' && webViewRef.current && isLoaded) {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        
-        if (status !== 'granted') {
-          webViewRef.current.injectJavaScript(`
-            (function() {
-              const statusElement = document.getElementById('status');
-              if (statusElement) {
-                statusElement.innerText = "Geolocation permission denied. Please enable it in your device settings.";
-              }
-            })();
-          `);
-          Alert.alert(
-            'Permission Required',
-            'This app needs location permission to use GPS. Please grant permission in settings.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-
-        let location;
-        try {
-          location = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.High,
-            maximumAge: 10000,
-          });
-        } catch {
-          webViewRef.current.injectJavaScript(`
-            (function() {
-              const statusElement = document.getElementById('status');
-              if (statusElement) {
-                statusElement.innerText = "Current location is unavailable. Ensure location services are enabled and try again.";
-              }
-            })();
-          `);
-          Alert.alert(
-            'Location Unavailable',
-            'Unable to get current location. Please ensure location services are enabled and you have a GPS signal.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-
-        webViewRef.current.injectJavaScript(`
-          (function() {
-            const latInput = document.getElementById('lat-input');
-            const lonInput = document.getElementById('lon-input');
-            if (latInput && lonInput) {
-              latInput.value = '${location.coords.latitude.toFixed(6)}';
-              lonInput.value = '${location.coords.longitude.toFixed(6)}';
-              const manualSubmitBtn = document.getElementById('manual-submit');
-              if (manualSubmitBtn) manualSubmitBtn.click();
+    useEffect(() => {
+        const t = setInterval(async () => {
+            const s = await Network.getNetworkStateAsync();
+            if (loaded) {
+                webViewRef.current?.postMessage(JSON.stringify({ type: "SET_OFFLINE", value: !s.isConnected }));
             }
-          })();
-        `);
-      }
-    } catch {
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
-    }
-  };
+        }, 4000);
+        return () => clearInterval(t);
+    }, [loaded]);
 
-  const injectedJavaScript = `
-    document.getElementById('gps-submit').addEventListener('click', () => {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ action: 'get_location' }));
-    });
-    true;
-  `;
+    const handleMessage = async (e: WebViewMessageEvent) => {
+        const data = JSON.parse(e.nativeEvent.data);
+        if (data.action === "get_location") {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== "granted") { Alert.alert("Permission needed"); return; }
+            const loc = await Location.getCurrentPositionAsync({});
+            webViewRef.current?.injectJavaScript(
+                "document.getElementById('lat').value='" + loc.coords.latitude.toFixed(6) + "';" +
+                "document.getElementById('lon').value='" + loc.coords.longitude.toFixed(6) + "';" +
+                "analyze();"
+            );
+        }
+    };
 
-  return (
-    <View style={styles.container}>
-      <WebView
-        ref={webViewRef}
-        originWhitelist={['*']}
-        source={{ html: HTML_TEMPLATE }}
-        style={styles.webView}
-        onMessage={handleMessage}
-        injectedJavaScript={injectedJavaScript}
-        onLoadEnd={() => setIsLoaded(true)}
-        onError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent;
-          Alert.alert('WebView Error', nativeEvent.description);
-        }}
-      />
-    </View>
-  );
+    return (
+        <View style={{ flex: 1 }}>
+            <WebView
+                ref={webViewRef}
+                source={{ html: HTML_TEMPLATE }}
+                onMessage={handleMessage}
+                onLoadEnd={() => setLoaded(true)}
+                javaScriptEnabled
+                domStorageEnabled
+                mixedContentMode="compatibility"
+            />
+        </View>
+    );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  webView: {
-    flex: 1,
-  },
-});
