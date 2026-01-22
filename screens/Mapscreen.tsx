@@ -246,7 +246,7 @@ input::placeholder { color: #94a3b8; }
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-var BACKEND_URL = "http://10.101.59.109:8000";
+var BACKEND_URL = "https://robust-creation-production-4377.up.railway.app";
 var map = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5);
 
 // Modern Tile Layer
