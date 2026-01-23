@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import ChatbotScreen from './screens/ChatbotScreen';
 import MapScreen from './screens/Mapscreen';
-import AgriSubsidyScreen from './screens/AgriSubsidyScreen'; 
+import AgriSubsidyScreen from './screens/AgriSubsidyScreen';
 
 
 const HomeScreen = ({ navigation }: any) => {
@@ -25,29 +25,29 @@ const HomeScreen = ({ navigation }: any) => {
           </Text>
         </View>
 
-        
+
         <TouchableOpacity
           style={styles.card}
           onPress={() => navigation.navigate('Chatbot')}
         >
-          <Text style={styles.cardTitle}>Surya Chatbot</Text>
+          <Text style={styles.cardTitle}>AgriX Intelligence</Text>
           <Text style={styles.cardText}>
-            Get instant advice on diseases, fertilizers, and farming techniques.
+            Get instant AI advice on diseases, fertilizers, and farming techniques.
           </Text>
         </TouchableOpacity>
 
-       
+
         <TouchableOpacity
           style={styles.card}
           onPress={() => navigation.navigate('Map')}
         >
-          <Text style={styles.cardTitle}>Map & Analytics</Text>
+          <Text style={styles.cardTitle}>Satellite Analytics</Text>
           <Text style={styles.cardText}>
             View your fields on a map, track crop health, and analyze soil data.
           </Text>
         </TouchableOpacity>
 
-        
+
         <TouchableOpacity
           style={styles.card}
           onPress={() => navigation.navigate('Subsidiary')}
@@ -72,38 +72,42 @@ export default function App() {
         initialRouteName="Home"
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: '#2E8B57',
-          tabBarInactiveTintColor: '#A9A9A9',
-          tabBarLabelStyle: { fontSize: 12, fontWeight: 'bold' },
-          tabBarStyle: { backgroundColor: '#F0FFF0', borderTopColor: 'transparent', height: 60 },
+          tabBarActiveTintColor: '#059669',
+          tabBarInactiveTintColor: '#94a3b8',
+          tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+          tabBarStyle: { backgroundColor: '#ffffff', borderTopColor: '#f1f5f9', height: 65, paddingBottom: 10 },
         }}
       >
         <Tab.Screen
           name="Home"
           component={HomeScreen}
           options={{
-            tabBarIcon: ({ color, size }) => <Ionicons name="home" color={color} size={size} />,
+            tabBarLabel: 'Dashboard',
+            tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="grid" color={color} size={22} />,
           }}
         />
         <Tab.Screen
           name="Map"
           component={MapScreen}
           options={{
-            tabBarIcon: ({ color, size }) => <Ionicons name="map" color={color} size={size} />,
+            tabBarLabel: 'Map',
+            tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="map" color={color} size={22} />,
           }}
         />
         <Tab.Screen
           name="Chatbot"
           component={ChatbotScreen}
           options={{
-            tabBarIcon: ({ color, size }) => <Ionicons name="chatbox-ellipses" color={color} size={size} />,
+            tabBarLabel: 'AgriX AI',
+            tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="chatbubbles" color={color} size={22} />,
           }}
         />
         <Tab.Screen
           name="Subsidiary"
           component={AgriSubsidyScreen}
           options={{
-            tabBarIcon: ({ color, size }) => <Ionicons name="cube" color={color} size={size} />,
+            tabBarLabel: 'Subsidies',
+            tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name="leaf" color={color} size={22} />,
           }}
         />
       </Tab.Navigator>
@@ -113,15 +117,15 @@ export default function App() {
 
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#D9F99D' },
-  scrollContent: { padding: 16, paddingBottom: 100 },
-  header: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 16 },
-  headerText: { fontSize: 28, fontWeight: 'bold', color: '#065F46' },
-  welcomeCard: { backgroundColor: '#D9F99D', padding: 16, borderRadius: 12, marginVertical: 8 },
-  welcomeTitle: { fontSize: 22, fontWeight: 'bold', color: '#065F46' },
-  welcomeText: { marginTop: 8, fontSize: 16, color: '#065F46' },
-  card: { backgroundColor: '#F0FFF0', padding: 16, borderRadius: 12, marginVertical: 8, borderWidth: 1, borderColor: '#D1D5DB' },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#065F46' },
-  cardText: { marginTop: 4, fontSize: 14, color: '#065F46' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  scrollContent: { padding: 20, paddingBottom: 100 },
+  header: { paddingVertical: 20, alignItems: 'center' },
+  headerText: { fontSize: 32, fontWeight: '900', color: '#10b981', letterSpacing: -1 },
+  welcomeCard: { backgroundColor: '#ffffff', padding: 20, borderRadius: 20, marginBottom: 15, borderLeftWidth: 5, borderLeftColor: '#10b981', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  welcomeTitle: { fontSize: 24, fontWeight: '800', color: '#1e293b' },
+  welcomeText: { marginTop: 8, fontSize: 15, color: '#64748b', lineHeight: 22 },
+  card: { backgroundColor: '#ffffff', padding: 20, borderRadius: 20, marginVertical: 8, borderWidth: 1, borderColor: '#f1f5f9', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 5, elevation: 1 },
+  cardTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
+  cardText: { marginTop: 4, fontSize: 14, color: '#64748b', lineHeight: 20 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });

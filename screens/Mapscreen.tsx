@@ -51,6 +51,7 @@ body, html {
   border-radius: 14px;
   border: 1px solid var(--glass-border);
   box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  z-index: 5000;
 }
 
 .brand {
@@ -114,44 +115,32 @@ input::placeholder { color: #94a3b8; }
   font-size: 16px;
 }
 
-/* Side Layer Controls */
+input::placeholder { color: #94a3b8; }
+
 .side-controls {
   top: 90px; left: 15px;
-  background: var(--glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  padding: 6px;
-  border-radius: 14px;
-  border: 1px solid var(--glass-border);
-  display: flex; flex-direction: column; gap: 4px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-}
-
-@media (max-width: 400px) {
-  .side-controls { top: 100px; }
-  .logo-container span { display: none; }
+  display: flex; flex-direction: column; gap: 8px;
+  z-index: 9999 !important;
 }
 
 .layer-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  padding: 8px 6px;
-  border-radius: 10px;
-  color: #64748b;
-  font-size: 10px;
-  font-weight: 600;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  width: 54px;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-}
-.layer-btn i { font-size: 14px; }
-.layer-btn.active {
   background: white;
-  color: var(--primary);
-  border-color: #e2e8f0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+  padding: 10px 8px;
+  border-radius: 12px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 60px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  pointer-events: auto;
+}
+.layer-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
 }
 
 /* Bottom Stats Card */
@@ -166,8 +155,9 @@ input::placeholder { color: #94a3b8; }
   box-shadow: 0 8px 32px rgba(0,0,0,0.12);
   transform: translateY(130%);
   transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: none;
 }
-.stats-card.visible { transform: translateY(0); }
+.stats-card.visible { transform: translateY(0); pointer-events: auto; }
 
 .stats-grid { 
   display: grid; 
@@ -246,12 +236,14 @@ input::placeholder { color: #94a3b8; }
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-var BACKEND_URL = "https://robust-creation-production-4377.up.railway.app";
-var map = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5);
+var BACKEND_URL = "http://10.101.59.69:8000";
+console.log("Connecting to:", BACKEND_URL);
+var map = L.map('map', { zoomControl: false, tap: false }).setView([20.5937, 78.9629], 5);
 
 // Modern Tile Layer
 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap &copy; CARTO'
+  attribution: '&copy; OpenStreetMap &copy; CARTO',
+  maxZoom: 19
 }).addTo(map);
 
 var currentLayer = null;
@@ -313,44 +305,64 @@ function gps() {
 }
 
 async function load(lat, lon) {
-  updateStatus("Syncing Satellites...", "", true);
+  updateStatus("Scanning field...", "", true);
   document.getElementById("stats-card").classList.remove("visible");
   
   try {
     let url = BACKEND_URL + "/get_field_health?lat=" + lat + "&lon=" + lon;
-    let res = await fetch(url);
+    console.log("Production Scan:", url);
+    
+    let res = await fetch(url, {
+      method: "GET",
+      mode: "cors",
+      cache: "no-store"
+    });
+    
+    if (!res.ok) throw "Server reachable but returned " + res.status;
     let data = await res.json();
 
     if (data.error) throw data.error;
     lastData = data;
 
     // Update Card Data
-    document.getElementById("val-health").innerText = data.health_status;
-    document.getElementById("val-temp").innerText = data.avg_temp_celsius + "°C";
-    document.getElementById("val-carbon").innerText = data.soil_organic_carbon;
+    document.getElementById("val-health").innerText = data.health_status || "Analyzed";
+    document.getElementById("val-temp").innerText = (data.avg_temp_celsius || "--") + "°C";
+    document.getElementById("val-carbon").innerText = data.soil_organic_carbon || "Normal";
 
     if (currentLayer) map.removeLayer(currentLayer);
     
+    // Auto-select NDVI
     switchLayer('ndvi_map_url', document.getElementById("btn-ndvi"));
 
-    currentLayer = L.polygon(data.field_boundary, {
-      color: "#10b981", 
-      weight: 3, 
-      fillColor: "#10b981",
-      fillOpacity: 0.1
-    }).addTo(map);
-    
-    map.flyToBounds(currentLayer.getBounds(), { padding: [50, 50], duration: 1.5 });
+    if (data.field_boundary && data.field_boundary.length > 0) {
+      currentLayer = L.polygon(data.field_boundary, {
+        color: "#10b981", 
+        weight: 3, 
+        fillColor: "#10b981",
+        fillOpacity: 0.1
+      }).addTo(map);
+      map.flyToBounds(currentLayer.getBounds(), { padding: [50, 50], duration: 1 });
+    } else {
+      console.warn("No boundary found, zooming to point.");
+      map.flyTo([lat, lon], 17, { duration: 1 });
+    }
     
     setTimeout(() => {
       document.getElementById("stats-card").classList.add("visible");
-      updateStatus("Analysis Complete", "");
+      updateStatus("Analysis Complete", "fa-circle-check");
     }, 500);
 
   } catch (e) {
+    console.error("Critical Load Error:", e);
     updateStatus("Sync Failed", "fa-circle-xmark");
+    alert("Connection Error. Please check if your internet is on and try again.");
   }
 }
+
+window.onerror = function(msg, url, line) {
+  window.ReactNativeWebView.postMessage(JSON.stringify({ type: "ERROR", msg: msg, line: line }));
+  return false;
+};
 
 window.addEventListener("message", e => {
   let d = JSON.parse(e.data);
@@ -364,44 +376,46 @@ window.addEventListener("message", e => {
 `;
 
 export default function MapScreen() {
-    const webViewRef = useRef<WebView>(null);
-    const [loaded, setLoaded] = useState(false);
+  const webViewRef = useRef<WebView>(null);
+  const [loaded, setLoaded] = useState(false);
 
-    useEffect(() => {
-        const t = setInterval(async () => {
-            const s = await Network.getNetworkStateAsync();
-            if (loaded) {
-                webViewRef.current?.postMessage(JSON.stringify({ type: "SET_OFFLINE", value: !s.isConnected }));
-            }
-        }, 4000);
-        return () => clearInterval(t);
-    }, [loaded]);
+  useEffect(() => {
+    const t = setInterval(async () => {
+      const s = await Network.getNetworkStateAsync();
+      if (loaded) {
+        webViewRef.current?.postMessage(JSON.stringify({ type: "SET_OFFLINE", value: !s.isConnected }));
+      }
+    }, 4000);
+    return () => clearInterval(t);
+  }, [loaded]);
 
-    const handleMessage = async (e: WebViewMessageEvent) => {
-        const data = JSON.parse(e.nativeEvent.data);
-        if (data.action === "get_location") {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== "granted") { Alert.alert("Permission needed"); return; }
-            const loc = await Location.getCurrentPositionAsync({});
-            webViewRef.current?.injectJavaScript(
-                "document.getElementById('lat').value='" + loc.coords.latitude.toFixed(6) + "';" +
-                "document.getElementById('lon').value='" + loc.coords.longitude.toFixed(6) + "';" +
-                "analyze();"
-            );
-        }
-    };
+  const handleMessage = async (e: WebViewMessageEvent) => {
+    const data = JSON.parse(e.nativeEvent.data);
+    if (data.action === "get_location") {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") { Alert.alert("Permission needed"); return; }
+      const loc = await Location.getCurrentPositionAsync({});
+      webViewRef.current?.injectJavaScript(
+        "document.getElementById('lat').value='" + loc.coords.latitude.toFixed(6) + "';" +
+        "document.getElementById('lon').value='" + loc.coords.longitude.toFixed(6) + "';" +
+        "analyze();"
+      );
+    } else if (data.type === "ERROR") {
+      console.warn("WebView Error:", data.msg, "at line", data.line);
+    }
+  };
 
-    return (
-        <View style={{ flex: 1 }}>
-            <WebView
-                ref={webViewRef}
-                source={{ html: HTML_TEMPLATE }}
-                onMessage={handleMessage}
-                onLoadEnd={() => setLoaded(true)}
-                javaScriptEnabled
-                domStorageEnabled
-                mixedContentMode="compatibility"
-            />
-        </View>
-    );
+  return (
+    <View style={{ flex: 1 }}>
+      <WebView
+        ref={webViewRef}
+        source={{ html: HTML_TEMPLATE }}
+        onMessage={handleMessage}
+        onLoadEnd={() => setLoaded(true)}
+        javaScriptEnabled
+        domStorageEnabled
+        mixedContentMode="compatibility"
+      />
+    </View>
+  );
 }
